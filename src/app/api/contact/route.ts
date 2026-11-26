@@ -15,8 +15,10 @@ function jsonResponse(body: Record<string, unknown>, status: number) {
 
 export async function POST(request: Request) {
   const secret = process.env.TURNSTILE_SECRET_KEY;
-  const expectedHostname = process.env.TURNSTILE_EXPECTED_HOSTNAME;
-  const webhookValue = process.env.DISCORD_CONTACT_WEBHOOK_URL;
+  const expectedHostname =
+    process.env.TURNSTILE_EXPECTED_HOSTNAME || "nexi499.de";
+  const webhookValue =
+    process.env.DISCORD_CONTACT_WEBHOOK_URL || process.env.DISCORD_WEBHOOK_URL;
 
   if (!secret || !expectedHostname || !webhookValue) {
     console.error("Contact form is missing server configuration.");
@@ -154,18 +156,27 @@ export async function POST(request: Request) {
         ],
       }),
       cache: "no-store",
-      redirect: "error",
+      redirect: "manual",
     });
-  } catch {
-    console.error("Could not deliver the contact message to Discord.");
-    return jsonResponse({ error: "Could not send your message. Please try again." }, 502);
+  } catch (error) {
+    const errorType = error instanceof Error ? error.name : "Unknown error";
+    console.error(`Discord contact delivery failed (${errorType}).`);
+    return jsonResponse(
+      { error: "Could not reach the contact service. Please try again." },
+      502,
+    );
   }
 
   if (!discordResponse.ok) {
     console.error(
       `Discord contact webhook returned HTTP ${discordResponse.status}.`,
     );
-    return jsonResponse({ error: "Could not send your message. Please try again." }, 502);
+    return jsonResponse(
+      {
+        error: `The contact service rejected the message (HTTP ${discordResponse.status}). Please try again.`,
+      },
+      502,
+    );
   }
 
   return jsonResponse({ success: true }, 200);

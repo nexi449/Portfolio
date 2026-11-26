@@ -49,8 +49,8 @@ Open [http://localhost:4000](http://localhost:4000).
 | --- | --- |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY` | Cloudflare Turnstile site key used by the browser widget. |
 | `TURNSTILE_SECRET_KEY` | Turnstile verification secret. Keep this server-side; never add a `NEXT_PUBLIC_` prefix. |
-| `TURNSTILE_EXPECTED_HOSTNAME` | Hostname configured for the Turnstile widget, such as `localhost` or your deployed domain. |
-| `DISCORD_CONTACT_WEBHOOK_URL` | Private Discord webhook URL used by the contact API. Never expose or commit it. |
+| `TURNSTILE_EXPECTED_HOSTNAME` | Hostname configured for the Turnstile widget, such as `localhost` or your deployed domain. Defaults to `nexi499.de` in production. |
+| `DISCORD_CONTACT_WEBHOOK_URL` | Private Discord webhook URL used by the contact API. `DISCORD_WEBHOOK_URL` is also accepted for existing deployments. Never expose or commit it. |
 | `LANYARD_USER_ID` | Discord user ID whose Spotify activity is displayed. This ID is passed to the browser and is not a secret. |
 | `STEAM_API_KEY` | Private Steam Web API key used server-side to load the public game library. Never expose or commit it. |
 
