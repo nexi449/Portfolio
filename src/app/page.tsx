@@ -8,6 +8,7 @@ const socials = [
   { brand: "modrinth" as const, href: "https://modrinth.com/user/nexi499", label: "Modrinth" },
   { brand: "curseforge" as const, href: "https://www.curseforge.com/members/nexi499/projects", label: "CurseForge" },
   { brand: "youtube" as const, href: "https://www.youtube.com/@nexi499", label: "YouTube" },
+  { brand: "x" as const, href: "https://x.com/nexi499", label: "X (Twitter)" },
   {
     brand: "discord" as const,
     href: "https://discord.com/users/1215763220875448342",

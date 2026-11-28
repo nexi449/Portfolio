@@ -143,6 +143,7 @@ export default function SiteHeader() {
             label="CurseForge"
           />
           <IconLink brand="youtube" href="https://www.youtube.com/@nexi499" label="YouTube" />
+          <IconLink brand="x" href="https://x.com/nexi499" label="X (Twitter)" />
           <IconLink
             brand="discord"
             href="https://discord.com/users/1215763220875448342"

@@ -343,6 +343,10 @@ button:focus-visible {
   color: #f16436;
 }
 
+.icon-link[data-brand="x"]:hover {
+  color: #fff;
+}
+
 .icon-link[data-brand="youtube"]:hover {
   color: #ff3333;
 }
@@ -356,7 +360,7 @@ button:focus-visible {
 }
 
 .icon-link[data-brand="outlook"]:hover {
-  color: var(--foreground);
+  color: #0078d4;
 }
 
 .icon-link svg {
