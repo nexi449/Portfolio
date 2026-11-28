@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type SteamGame = {
   appId: number;
@@ -16,6 +16,18 @@ type GamesState =
   | { status: "loading" }
   | { status: "error"; message: string }
   | { status: "loaded"; games: SteamGame[] };
+
+type GameDetails = {
+  developers: string[];
+  publishers: string[];
+  genres: string[];
+  releaseDate: string | null;
+  metacriticScore: number | null;
+};
+
+type GameDetailsState =
+  | { status: "idle" | "loading" | "error" }
+  | { status: "loaded"; details: GameDetails };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -38,6 +50,9 @@ function isSteamGame(value: unknown): value is SteamGame {
         typeof url === "string" &&
         (url.startsWith("https://cdn.cloudflare.steamstatic.com/steam/apps/") ||
           url.startsWith(
+            "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/",
+          ) ||
+          url.startsWith(
             "https://media.steampowered.com/steamcommunity/public/images/apps/",
           )),
     ) &&
@@ -49,12 +64,80 @@ function isGamesResponse(value: unknown): value is { games: SteamGame[] } {
   return isRecord(value) && Array.isArray(value.games) && value.games.every(isSteamGame);
 }
 
+function isGameDetails(value: unknown): value is GameDetails {
+  return (
+    isRecord(value) &&
+    Array.isArray(value.developers) &&
+    value.developers.every((item) => typeof item === "string") &&
+    Array.isArray(value.publishers) &&
+    value.publishers.every((item) => typeof item === "string") &&
+    Array.isArray(value.genres) &&
+    value.genres.every((item) => typeof item === "string") &&
+    (typeof value.releaseDate === "string" || value.releaseDate === null) &&
+    (typeof value.metacriticScore === "number" ||
+      value.metacriticScore === null)
+  );
+}
+
 function formatPlaytime(minutes: number) {
   return `${(minutes / 60).toFixed(1)} hours`;
 }
 
 function GameCard({ game }: { game: SteamGame }) {
-  const [imageIndex, setImageIndex] = useState(0);
+  const [imageFailed, setImageFailed] = useState(false);
+  const [detailsState, setDetailsState] = useState<GameDetailsState>({
+    status: "idle",
+  });
+  const detailsRequestStarted = useRef(false);
+  const monogram = game.name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase();
+  const details =
+    detailsState.status === "loaded" ? detailsState.details : null;
+  const publisherOnly =
+    details?.publishers.filter(
+      (publisher) => !details.developers.includes(publisher),
+    ) ?? [];
+  const credits = [
+    ...(details?.developers.length
+      ? [`Developer: ${details.developers.join(", ")}`]
+      : []),
+    ...(publisherOnly.length
+      ? [`Publisher: ${publisherOnly.join(", ")}`]
+      : []),
+  ].join(" · ");
+
+  async function loadDetails() {
+    if (detailsRequestStarted.current) return;
+    detailsRequestStarted.current = true;
+    setDetailsState({ status: "loading" });
+
+    try {
+      const response = await fetch(`/api/steam/games/${game.appId}`);
+      let payload: unknown;
+      try {
+        payload = await response.json();
+      } catch {
+        throw new Error("Steam returned an invalid game details response.");
+      }
+
+      if (!response.ok || !isGameDetails(payload)) {
+        throw new Error(
+          isRecord(payload) && typeof payload.error === "string"
+            ? payload.error
+            : `Could not load game details (HTTP ${response.status}).`,
+        );
+      }
+
+      setDetailsState({ status: "loaded", details: payload });
+    } catch (error) {
+      console.error(`Could not load Steam details for app ${game.appId}.`, error);
+      setDetailsState({ status: "error" });
+    }
+  }
 
   return (
     <a
@@ -62,29 +145,55 @@ function GameCard({ game }: { game: SteamGame }) {
       aria-label={`${game.name}, ${formatPlaytime(game.playtimeMinutes)} played, ${formatPlaytime(game.recentPlaytimeMinutes)} in the last two weeks`}
       className="game-card"
       href={game.storeUrl}
+      onFocus={() => void loadDetails()}
+      onMouseEnter={() => void loadDetails()}
       rel="noreferrer"
       target="_blank"
     >
-      <Image
-        alt=""
-        height={48}
-        onError={() => {
-          setImageIndex((index) =>
-            Math.min(index + 1, game.imageUrls.length - 1),
-          );
-        }}
-        src={game.imageUrls[imageIndex]}
-        unoptimized
-        width={48}
-      />
+      {imageFailed ? (
+        <span aria-hidden="true" className="game-card-fallback">
+          {monogram}
+        </span>
+      ) : (
+        <Image
+          alt=""
+          height={120}
+          onError={() => setImageFailed(true)}
+          src={game.imageUrls[0]}
+          unoptimized
+          width={80}
+        />
+      )}
       <span
         className="game-tooltip"
         id={`game-tooltip-${game.appId}`}
         role="tooltip"
       >
         <strong>{game.name}</strong>
-        <span>Total playtime: {formatPlaytime(game.playtimeMinutes)}</span>
-        <span>Last 2 weeks: {formatPlaytime(game.recentPlaytimeMinutes)}</span>
+        {detailsState.status === "loading" && <span>Loading game details…</span>}
+        {detailsState.status === "error" && (
+          <span>Extra game details are temporarily unavailable.</span>
+        )}
+        {details && (
+          <>
+            {details.genres.length > 0 && (
+              <span>{details.genres.join(" · ")}</span>
+            )}
+            {credits && <span>{credits}</span>}
+            {(details.releaseDate || details.metacriticScore !== null) && (
+              <span>
+                {details.releaseDate && `Released ${details.releaseDate}`}
+                {details.releaseDate && details.metacriticScore !== null && " · "}
+                {details.metacriticScore !== null &&
+                  `Metacritic ${details.metacriticScore}/100`}
+              </span>
+            )}
+          </>
+        )}
+        <span>
+          {formatPlaytime(game.playtimeMinutes)} total ·{" "}
+          {formatPlaytime(game.recentPlaytimeMinutes)} recent
+        </span>
       </span>
     </a>
   );

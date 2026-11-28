@@ -40,16 +40,6 @@ function parseGames(payload: unknown): SteamGame[] | null {
     }
 
     const appId = game.appid;
-    const iconHash =
-      typeof game.img_icon_url === "string" && game.img_icon_url
-        ? game.img_icon_url
-        : typeof game.img_logo_url === "string" && game.img_logo_url
-          ? game.img_logo_url
-          : null;
-    const iconUrl = iconHash
-      ? `https://media.steampowered.com/steamcommunity/public/images/apps/${appId}/${encodeURIComponent(iconHash)}.jpg`
-      : `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/capsule_sm_120.jpg`;
-
     games.push({
       appId,
       name:
@@ -65,8 +55,6 @@ function parseGames(payload: unknown): SteamGame[] | null {
           : 0,
       imageUrls: [
         `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`,
-        `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/header.jpg`,
-        iconUrl,
       ],
       storeUrl: `https://store.steampowered.com/app/${appId}/`,
     });

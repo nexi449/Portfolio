@@ -9,6 +9,8 @@ type Track = {
   artist: string;
   album: string;
   observedAt: number;
+  startedAt: number | null;
+  endsAt: number | null;
 };
 
 type ConnectionState = "connecting" | "live" | "reconnecting" | "error";
@@ -22,6 +24,16 @@ function parseTrack(presence: unknown): Track | null {
   if (!isRecord(presence.spotify)) return null;
 
   const spotify = presence.spotify;
+  const timestamps = isRecord(spotify.timestamps) ? spotify.timestamps : null;
+  const startedAt =
+    typeof timestamps?.start === "number" && Number.isFinite(timestamps.start)
+      ? timestamps.start
+      : null;
+  const endsAt =
+    typeof timestamps?.end === "number" && Number.isFinite(timestamps.end)
+      ? timestamps.end
+      : null;
+
   if (
     typeof spotify.track_id !== "string" ||
     !/^[a-zA-Z0-9]{22}$/.test(spotify.track_id) ||
@@ -39,7 +51,56 @@ function parseTrack(presence: unknown): Track | null {
     artist: spotify.artist,
     album: typeof spotify.album === "string" ? spotify.album : "",
     observedAt: Date.now(),
+    startedAt: startedAt !== null && endsAt !== null && endsAt > startedAt
+      ? startedAt
+      : null,
+    endsAt: startedAt !== null && endsAt !== null && endsAt > startedAt
+      ? endsAt
+      : null,
   };
+}
+
+function formatDuration(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}:${String(remainder).padStart(2, "0")}`;
+}
+
+function SongProgress({
+  startedAt,
+  endsAt,
+  now,
+}: {
+  startedAt: number;
+  endsAt: number;
+  now: number;
+}) {
+  const duration = endsAt - startedAt;
+  const elapsed = Math.max(0, Math.floor((now - startedAt) / 1000));
+  const remaining = Math.max(0, Math.ceil((endsAt - now) / 1000));
+  const progress = Math.min(100, Math.max(0, ((now - startedAt) / duration) * 100));
+
+  return (
+    <div className="activity-progress">
+      <div
+        aria-label="Song progress"
+        aria-valuemax={100}
+        aria-valuemin={0}
+        aria-valuenow={progress}
+        aria-valuetext={`${formatDuration(elapsed)} elapsed, ${formatDuration(remaining)} remaining`}
+        className="activity-progress-track"
+        role="progressbar"
+      >
+        <span
+          className="activity-progress-fill"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <span className="activity-progress-time">
+        -{formatDuration(remaining)}
+      </span>
+    </div>
+  );
 }
 
 function formatTime(timestamp: number) {
@@ -56,6 +117,14 @@ export default function ActivityFeed({ userId }: { userId: string | null }) {
   const [currentTrackId, setCurrentTrackId] = useState<string | null>(null);
   const [hasPresence, setHasPresence] = useState(false);
   const [connection, setConnection] = useState<ConnectionState>("connecting");
+  const [now, setNow] = useState(0);
+
+  useEffect(() => {
+    if (!currentTrackId) return;
+
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [currentTrackId]);
 
   useEffect(() => {
     if (userId === null) return;
@@ -107,6 +176,7 @@ export default function ActivityFeed({ userId }: { userId: string | null }) {
       setCurrentTrackId(track?.id ?? null);
 
       if (track) {
+        setNow(Date.now());
         setTracks((previous) => {
           if (previous[0]?.id === track.id) return previous;
           return [track, ...previous.filter((item) => item.id !== track.id)].slice(
@@ -246,6 +316,16 @@ export default function ActivityFeed({ userId }: { userId: string | null }) {
                 {track.album && (
                   <span className="activity-track-album">{track.album}</span>
                 )}
+                {index === 0 &&
+                  currentTrackId === track.id &&
+                  track.startedAt !== null &&
+                  track.endsAt !== null && (
+                    <SongProgress
+                      endsAt={track.endsAt}
+                      now={now}
+                      startedAt={track.startedAt}
+                    />
+                  )}
               </div>
               <div className="activity-meta">
                 <time dateTime={new Date(track.observedAt).toISOString()}>
